@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>SEVRR</title>
+<link href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&display=swap" rel="stylesheet">
+<!--
+  Landing page for SEVRR's confirmation and password reset emails (see AuthLink.swift).
+  Supabase redirects here with ?scheme=sevrr://confirm|reset-password plus its own parameters (a PKCE code, or an
+  error). This page hands them to the app. It exists because Gmail's in-app browser won't follow a server redirect
+  straight to a custom scheme: a visible button that the user taps always works.
+  Not built by scripts/build-legal-site.py, which leaves it alone.
+-->
+<style>
+:root{color-scheme:dark}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box;
+  background:#000;color:#fff;font:16px/1.6 'Inconsolata',ui-monospace,Menlo,monospace;text-align:center}
+.card{max-width:360px;width:100%}
+.mark{color:#66BBD4;font-weight:700;letter-spacing:3px;font-size:18px;margin-bottom:28px}
+h1{font-size:24px;line-height:1.25;margin:0 0 10px}
+p{color:#999;margin:0}
+a.btn{display:none;margin-top:28px;padding:16px 32px;border-radius:999px;background:#66BBD4;color:#000;
+  text-decoration:none;font-weight:700;font-size:17px}
+.hint{display:none;margin-top:16px;font-size:13px;color:#666}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="mark">SEVRR</div>
+  <h1 id="heading">Email confirmed</h1>
+  <p id="message">Open SEVRR to continue.</p>
+  <a class="btn" id="open">Open SEVRR</a>
+  <p class="hint" id="hint">If nothing happens, tap the button above.</p>
+</main>
+<script>
+(function () {
+  var ALLOWED = ['sevrr://confirm', 'sevrr://reset-password'];
+  var url = new URL(window.location.href);
+  var scheme = url.searchParams.get('scheme');
+  var heading = document.getElementById('heading');
+  var message = document.getElementById('message');
+  var open = document.getElementById('open');
+  var hint = document.getElementById('hint');
+
+  function show(title, text) { heading.textContent = title; message.textContent = text; }
+
+  // Only SEVRR's own links: anything else in ?scheme= (javascript:, another site) is refused.
+  if (ALLOWED.indexOf(scheme) === -1) {
+    show("That link isn't valid", 'Request a new email from SEVRR and try again.');
+    return;
+  }
+  var isReset = scheme === 'sevrr://reset-password';
+
+  // Supabase reports expired or used links as error parameters, in the query or the fragment.
+  var hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  var errorCode = url.searchParams.get('error_code') || hash.get('error_code');
+  var error = errorCode || url.searchParams.get('error') || hash.get('error');
+  if (error) {
+    show(isReset ? 'This reset link has expired' : 'This link has expired',
+      isReset ? 'It may have been used already. Open SEVRR and tap "Forgot password?" for a new one.'
+              : 'It may have been used already. Open SEVRR and sign in; it will offer to send a new link if needed.');
+    return;
+  }
+
+  // Hand everything except ?scheme= to the app, query and fragment both.
+  url.searchParams.delete('scheme');
+  var query = url.searchParams.toString();
+  var deepLink = scheme + (query ? '?' + query : '') + window.location.hash;
+
+  if (isReset) {
+    show('Reset your password', 'Open SEVRR to choose a new password.');
+  } else {
+    show('Email confirmed', 'Open SEVRR to finish signing in.');
+  }
+
+  var isPhone = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (isPhone) {
+    // The button is the dependable path; the quiet auto-open is a bonus and never replaces the message.
+    open.href = deepLink;
+    open.textContent = isReset ? 'Choose a new password' : 'Open SEVRR';
+    open.style.display = 'inline-block';
+    hint.style.display = 'block';
+    setTimeout(function () { window.location.href = deepLink; }, 400);
+  } else if (isReset) {
+    show('Open this link on your iPhone',
+      'Password reset links only work on the iPhone that asked for them. Open this email there and tap the link again.');
+  } else {
+    show('Email confirmed', 'Your email is confirmed. Open SEVRR on your iPhone and sign in with your email and password.');
+  }
+})();
+</script>
+</body>
+</html>
